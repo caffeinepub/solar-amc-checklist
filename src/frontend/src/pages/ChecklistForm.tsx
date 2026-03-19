@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -7,16 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useParams } from "@tanstack/react-router";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
-  Circle,
-  Loader2,
-  MinusCircle,
-  Send,
-  XCircle,
-} from "lucide-react";
+import { AlertCircle, ChevronRight, Loader2, Send } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -89,19 +80,16 @@ export default function ChecklistForm() {
   };
 
   const [localItems, setLocalItems] = useState<
-    Record<string, { status: Variant_NA_Fail_Pass_Unchecked; comment: string }>
+    Record<string, Variant_NA_Fail_Pass_Unchecked>
   >({});
 
   const itemsSeeded = useRef(false);
   useEffect(() => {
     if (report && !itemsSeeded.current) {
       itemsSeeded.current = true;
-      const map: Record<
-        string,
-        { status: Variant_NA_Fail_Pass_Unchecked; comment: string }
-      > = {};
+      const map: Record<string, Variant_NA_Fail_Pass_Unchecked> = {};
       for (const item of report.items) {
-        map[item.id] = { status: item.status, comment: item.comment };
+        map[item.id] = item.status;
       }
       setLocalItems(map);
     }
@@ -111,30 +99,12 @@ export default function ChecklistForm() {
     itemId: string,
     status: Variant_NA_Fail_Pass_Unchecked,
   ) => {
-    const comment = localItems[itemId]?.comment ?? "";
-    setLocalItems((prev) => ({ ...prev, [itemId]: { status, comment } }));
-    updateItem.mutate({ itemId, status, comment });
-  };
-
-  const handleCommentChange = (itemId: string, comment: string) => {
-    setLocalItems((prev) => ({
-      ...prev,
-      [itemId]: {
-        status:
-          prev[itemId]?.status ?? Variant_NA_Fail_Pass_Unchecked.Unchecked,
-        comment,
-      },
-    }));
-  };
-
-  const handleCommentBlur = (itemId: string) => {
-    const item = localItems[itemId];
-    if (!item) return;
-    updateItem.mutate({ itemId, status: item.status, comment: item.comment });
+    setLocalItems((prev) => ({ ...prev, [itemId]: status }));
+    updateItem.mutate({ itemId, status, comment: "" });
   };
 
   const checkedCount = Object.values(localItems).filter(
-    (i) => i.status !== Variant_NA_Fail_Pass_Unchecked.Unchecked,
+    (s) => s !== Variant_NA_Fail_Pass_Unchecked.Unchecked,
   ).length;
   const progressPct = Math.round((checkedCount / TOTAL_ITEMS) * 100);
 
@@ -149,7 +119,6 @@ export default function ChecklistForm() {
     try {
       await updateMeta.mutateAsync(meta);
       await submitReport.mutateAsync(reportId);
-      // Auto-copy the report link to clipboard
       const reportUrl = `${window.location.origin}/reports/${reportId}`;
       try {
         await navigator.clipboard.writeText(reportUrl);
@@ -178,7 +147,8 @@ export default function ChecklistForm() {
       notes: meta.notes,
       items: report.items.map((item) => ({
         ...item,
-        ...(localItems[item.id] ?? {}),
+        status: localItems[item.id] ?? item.status,
+        comment: "",
       })),
     };
     return <ReportSuccess report={mergedReport} reportId={reportId} />;
@@ -229,46 +199,13 @@ export default function ChecklistForm() {
         <div className="bg-card border border-border rounded-lg px-5 py-4 mb-5 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-foreground">
-              {checkedCount} of {TOTAL_ITEMS} items completed
+              {checkedCount} of {TOTAL_ITEMS} items checked
             </span>
             <span className="text-sm font-semibold text-primary">
               {progressPct}%
             </span>
           </div>
           <Progress value={progressPct} className="h-2" />
-          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-              {
-                Object.values(localItems).filter(
-                  (i) => i.status === Variant_NA_Fail_Pass_Unchecked.Pass,
-                ).length
-              }{" "}
-              Pass
-            </span>
-            <span className="flex items-center gap-1">
-              <XCircle className="w-3.5 h-3.5 text-destructive" />
-              {
-                Object.values(localItems).filter(
-                  (i) => i.status === Variant_NA_Fail_Pass_Unchecked.Fail,
-                ).length
-              }{" "}
-              Fail
-            </span>
-            <span className="flex items-center gap-1">
-              <MinusCircle className="w-3.5 h-3.5 text-muted-foreground" />
-              {
-                Object.values(localItems).filter(
-                  (i) => i.status === Variant_NA_Fail_Pass_Unchecked.NA,
-                ).length
-              }{" "}
-              N/A
-            </span>
-            <span className="flex items-center gap-1">
-              <Circle className="w-3.5 h-3.5 text-muted-foreground" />
-              {TOTAL_ITEMS - checkedCount} Pending
-            </span>
-          </div>
         </div>
 
         {/* General Information */}
@@ -384,20 +321,25 @@ export default function ChecklistForm() {
               </div>
               <div className="divide-y divide-border">
                 {section.items.map((item) => {
-                  const itemState = localItems[item.id] ?? {
-                    status: Variant_NA_Fail_Pass_Unchecked.Unchecked,
-                    comment: "",
-                  };
+                  const status =
+                    localItems[item.id] ??
+                    Variant_NA_Fail_Pass_Unchecked.Unchecked;
+                  const isChecked =
+                    status !== Variant_NA_Fail_Pass_Unchecked.Unchecked;
                   return (
                     <ChecklistRow
                       key={item.id}
                       itemId={item.id}
                       task={item.task}
-                      status={itemState.status}
-                      comment={itemState.comment}
-                      onStatusChange={handleStatusChange}
-                      onCommentChange={handleCommentChange}
-                      onCommentBlur={handleCommentBlur}
+                      isChecked={isChecked}
+                      onToggle={(checked) =>
+                        handleStatusChange(
+                          item.id,
+                          checked
+                            ? Variant_NA_Fail_Pass_Unchecked.Pass
+                            : Variant_NA_Fail_Pass_Unchecked.Unchecked,
+                        )
+                      }
                     />
                   );
                 })}
@@ -474,105 +416,39 @@ export default function ChecklistForm() {
 interface ChecklistRowProps {
   itemId: string;
   task: string;
-  status: Variant_NA_Fail_Pass_Unchecked;
-  comment: string;
-  onStatusChange: (id: string, s: Variant_NA_Fail_Pass_Unchecked) => void;
-  onCommentChange: (id: string, c: string) => void;
-  onCommentBlur: (id: string) => void;
+  isChecked: boolean;
+  onToggle: (checked: boolean) => void;
 }
 
 function ChecklistRow({
   itemId,
   task,
-  status,
-  comment,
-  onStatusChange,
-  onCommentChange,
-  onCommentBlur,
+  isChecked,
+  onToggle,
 }: ChecklistRowProps) {
-  const rowBg =
-    status === Variant_NA_Fail_Pass_Unchecked.Pass
-      ? "bg-success/5"
-      : status === Variant_NA_Fail_Pass_Unchecked.Fail
-        ? "bg-destructive/5"
-        : status === Variant_NA_Fail_Pass_Unchecked.NA
-          ? "bg-muted/40"
-          : "";
-
   return (
-    <div className={cn("px-5 py-3 transition-colors", rowBg)}>
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-foreground leading-snug">{task}</p>
-          {(status === Variant_NA_Fail_Pass_Unchecked.Fail || comment) && (
-            <input
-              type="text"
-              placeholder="Add comment..."
-              value={comment}
-              onChange={(e) => onCommentChange(itemId, e.target.value)}
-              onBlur={() => onCommentBlur(itemId)}
-              className="mt-2 w-full text-xs border border-border rounded px-2 py-1 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              data-ocid="checklist.item_comment.input"
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <StatusButton
-            label="Pass"
-            active={status === Variant_NA_Fail_Pass_Unchecked.Pass}
-            activeClass="bg-success text-white border-success"
-            idleClass="border-border text-muted-foreground hover:border-success hover:text-success"
-            onClick={() =>
-              onStatusChange(itemId, Variant_NA_Fail_Pass_Unchecked.Pass)
-            }
-          />
-          <StatusButton
-            label="Fail"
-            active={status === Variant_NA_Fail_Pass_Unchecked.Fail}
-            activeClass="bg-destructive text-white border-destructive"
-            idleClass="border-border text-muted-foreground hover:border-destructive hover:text-destructive"
-            onClick={() =>
-              onStatusChange(itemId, Variant_NA_Fail_Pass_Unchecked.Fail)
-            }
-          />
-          <StatusButton
-            label="N/A"
-            active={status === Variant_NA_Fail_Pass_Unchecked.NA}
-            activeClass="bg-muted-foreground text-white border-muted-foreground"
-            idleClass="border-border text-muted-foreground hover:border-muted-foreground"
-            onClick={() =>
-              onStatusChange(itemId, Variant_NA_Fail_Pass_Unchecked.NA)
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusButton({
-  label,
-  active,
-  activeClass,
-  idleClass,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  activeClass: string;
-  idleClass: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
+    <label
+      htmlFor={`item-${itemId}`}
       className={cn(
-        "px-2.5 py-1 text-xs font-semibold rounded border transition-colors",
-        active ? activeClass : idleClass,
+        "flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-colors hover:bg-muted/30",
+        isChecked && "bg-success/5",
       )}
     >
-      {label}
-    </button>
+      <Checkbox
+        id={`item-${itemId}`}
+        checked={isChecked}
+        onCheckedChange={(checked) => onToggle(checked === true)}
+        className="w-5 h-5 flex-shrink-0"
+        data-ocid="checklist.item.checkbox"
+      />
+      <span
+        className={cn(
+          "text-sm leading-snug flex-1",
+          isChecked ? "text-muted-foreground line-through" : "text-foreground",
+        )}
+      >
+        {task}
+      </span>
+    </label>
   );
 }

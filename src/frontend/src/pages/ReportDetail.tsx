@@ -3,13 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Circle,
-  MinusCircle,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle } from "lucide-react";
 import { motion } from "motion/react";
 import { CHECKLIST_SECTIONS, MONTH_NAMES } from "../data/checklistData";
 import {
@@ -17,8 +11,6 @@ import {
   useGetReport,
 } from "../hooks/useQueries";
 
-// Normalize status: handles both string enum values and Candid variant objects
-// e.g. "Pass" or { Pass: null } both become Variant_NA_Fail_Pass_Unchecked.Pass
 function normalizeStatus(status: unknown): Variant_NA_Fail_Pass_Unchecked {
   if (typeof status === "string") {
     if (status === "Pass") return Variant_NA_Fail_Pass_Unchecked.Pass;
@@ -53,20 +45,12 @@ export default function ReportDetail() {
   }
 
   const monthName = MONTH_NAMES[Number(report.month) - 1];
-  const passCount = report.items.filter(
+  const completedCount = report.items.filter(
     (i) => normalizeStatus(i.status) === Variant_NA_Fail_Pass_Unchecked.Pass,
-  ).length;
-  const failCount = report.items.filter(
-    (i) => normalizeStatus(i.status) === Variant_NA_Fail_Pass_Unchecked.Fail,
-  ).length;
-  const naCount = report.items.filter(
-    (i) => normalizeStatus(i.status) === Variant_NA_Fail_Pass_Unchecked.NA,
   ).length;
 
   const getItemStatus = (itemId: string) =>
     normalizeStatus(report.items.find((i) => i.id === itemId)?.status);
-  const getItemComment = (itemId: string) =>
-    report.items.find((i) => i.id === itemId)?.comment ?? "";
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -150,21 +134,15 @@ export default function ReportDetail() {
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
-            <div className="px-5 py-3 text-center">
-              <p className="text-xl font-bold text-success">{passCount}</p>
-              <p className="text-xs text-muted-foreground">Passed</p>
-            </div>
-            <div className="px-5 py-3 text-center">
-              <p className="text-xl font-bold text-destructive">{failCount}</p>
-              <p className="text-xs text-muted-foreground">Failed</p>
-            </div>
-            <div className="px-5 py-3 text-center">
-              <p className="text-xl font-bold text-muted-foreground">
-                {naCount}
+          {/* Single completed stat */}
+          <div className="flex items-center justify-center py-4 border-b border-border">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-success">
+                {completedCount}
               </p>
-              <p className="text-xs text-muted-foreground">N/A</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Items Completed
+              </p>
             </div>
           </div>
 
@@ -188,24 +166,28 @@ export default function ReportDetail() {
                   <div className="divide-y divide-border">
                     {section.items.map((item) => {
                       const status = getItemStatus(item.id);
-                      const comment = getItemComment(item.id);
+                      const isPass =
+                        status === Variant_NA_Fail_Pass_Unchecked.Pass;
                       return (
                         <div
                           key={item.id}
-                          className="flex items-start gap-3 px-5 py-2.5"
+                          className="flex items-center gap-3 px-5 py-2.5"
                         >
-                          <StatusIcon status={status} />
-                          <div className="flex-1">
-                            <p className="text-sm text-foreground">
-                              {item.task}
-                            </p>
-                            {comment && (
-                              <p className="text-xs text-muted-foreground mt-0.5 italic">
-                                {comment}
-                              </p>
+                          {isPass ? (
+                            <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          )}
+                          <p
+                            className={cn(
+                              "text-sm flex-1",
+                              isPass
+                                ? "text-foreground"
+                                : "text-muted-foreground",
                             )}
-                          </div>
-                          <StatusBadge status={status} />
+                          >
+                            {item.task}
+                          </p>
                         </div>
                       );
                     })}
@@ -230,50 +212,4 @@ export default function ReportDetail() {
       </motion.div>
     </div>
   );
-}
-
-function StatusIcon({ status }: { status: Variant_NA_Fail_Pass_Unchecked }) {
-  if (status === Variant_NA_Fail_Pass_Unchecked.Pass)
-    return (
-      <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
-    );
-  if (status === Variant_NA_Fail_Pass_Unchecked.Fail)
-    return (
-      <XCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-    );
-  if (status === Variant_NA_Fail_Pass_Unchecked.NA)
-    return (
-      <MinusCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-    );
-  return (
-    <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-  );
-}
-
-function StatusBadge({ status }: { status: Variant_NA_Fail_Pass_Unchecked }) {
-  if (status === Variant_NA_Fail_Pass_Unchecked.Pass)
-    return (
-      <Badge
-        className="bg-success/15 text-success border-success/30 text-xs"
-        variant="outline"
-      >
-        Pass
-      </Badge>
-    );
-  if (status === Variant_NA_Fail_Pass_Unchecked.Fail)
-    return (
-      <Badge
-        className="bg-destructive/15 text-destructive border-destructive/30 text-xs"
-        variant="outline"
-      >
-        Fail
-      </Badge>
-    );
-  if (status === Variant_NA_Fail_Pass_Unchecked.NA)
-    return (
-      <Badge variant="outline" className="text-xs text-muted-foreground">
-        N/A
-      </Badge>
-    );
-  return null;
 }

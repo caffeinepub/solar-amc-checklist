@@ -12,7 +12,6 @@ import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
 actor {
-  // Types
   type ChecklistItem = {
     id : Text;
     section : Text;
@@ -42,22 +41,16 @@ actor {
     name : Text;
   };
 
-  module Report {
-    public func compare(r1 : Report, r2 : Report) : Order.Order {
-      Text.compare(r1.id, r2.id);
-    };
+  func compareReports(r1 : Report, r2 : Report) : Order.Order {
+    Text.compare(r1.id, r2.id);
   };
 
-  // Keep stable vars from previous version for upgrade compatibility
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
   let userProfiles = Map.empty<Principal, UserProfile>();
-
-  // Persistent Storage
   let reports = Map.empty<Text, Report>();
 
-  // Checklist Items Template
   let checklistTemplate : [ChecklistItem] = [
     { id = "sm1"; section = "Solar Modules"; task = "Cleaning & wiping with fresh water"; status = #Unchecked; comment = "" },
     { id = "sm2"; section = "Solar Modules"; task = "Visual Inspection of modules, mounting clamps, MC4 connectors"; status = #Unchecked; comment = "" },
@@ -82,29 +75,18 @@ actor {
     { id = "gs4"; section = "General System Check and Cleaning"; task = "Preparing total report of the visit"; status = #Unchecked; comment = "" },
   ];
 
-  // Helper to generate new report ID
   func generateReportId() : Text {
     Time.now().toText() # "RPT";
   };
 
-  // Public Functions (no login required)
-
   public shared func createReport(month : Nat, year : Nat) : async Text {
     let id = generateReportId();
     let newReport : Report = {
-      id;
-      month;
-      year;
-      clientName = "";
-      systemId = "";
-      inspectedBy = "";
-      date = "";
-      solarGenerationUnits = "";
-      solarGenerationPerMonth = "";
-      items = checklistTemplate;
-      notes = "";
-      submitted = false;
-      submittedAt = null;
+      id; month; year;
+      clientName = ""; systemId = ""; inspectedBy = ""; date = "";
+      solarGenerationUnits = ""; solarGenerationPerMonth = "";
+      items = checklistTemplate; notes = "";
+      submitted = false; submittedAt = null;
       createdAt = Time.now();
     };
     reports.add(id, newReport);
@@ -122,8 +104,7 @@ actor {
             } else { item };
           }
         );
-        reports.add(reportId, {
-          id = report.id; month = report.month; year = report.year;
+        reports.add(reportId, { id = report.id; month = report.month; year = report.year;
           clientName = report.clientName; systemId = report.systemId;
           inspectedBy = report.inspectedBy; date = report.date;
           solarGenerationUnits = report.solarGenerationUnits;
@@ -140,8 +121,7 @@ actor {
     switch (reports.get(reportId)) {
       case (null) { Runtime.trap("Report not found") };
       case (?report) {
-        reports.add(reportId, {
-          id = report.id; month = report.month; year = report.year;
+        reports.add(reportId, { id = report.id; month = report.month; year = report.year;
           clientName; systemId; inspectedBy; date;
           solarGenerationUnits; solarGenerationPerMonth;
           items = report.items; notes;
@@ -156,8 +136,7 @@ actor {
     switch (reports.get(reportId)) {
       case (null) { Runtime.trap("Report not found") };
       case (?report) {
-        reports.add(reportId, {
-          id = report.id; month = report.month; year = report.year;
+        reports.add(reportId, { id = report.id; month = report.month; year = report.year;
           clientName = report.clientName; systemId = report.systemId;
           inspectedBy = report.inspectedBy; date = report.date;
           solarGenerationUnits = report.solarGenerationUnits;
@@ -171,7 +150,7 @@ actor {
   };
 
   public query func listReports() : async [Report] {
-    reports.values().toArray().sort();
+    reports.values().toArray().sort(compareReports);
   };
 
   public query func getReport(reportId : Text) : async Report {
