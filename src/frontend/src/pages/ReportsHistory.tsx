@@ -13,11 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "@tanstack/react-router";
-import { Calendar, Eye, FileText, Trash2 } from "lucide-react";
+import { Calendar, Eye, FileText, Share2, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { MONTH_NAMES } from "../data/checklistData";
 import { useDeleteReport, useListReports } from "../hooks/useQueries";
+import { copyToClipboard } from "../lib/clipboard";
 
 export default function ReportsHistory() {
   const navigate = useNavigate();
@@ -37,6 +38,16 @@ export default function ReportsHistory() {
       toast.success("Report deleted.");
     } catch {
       toast.error("Failed to delete report.");
+    }
+  };
+
+  const handleShare = async (reportId: string) => {
+    const url = `${window.location.origin}/reports/${reportId}`;
+    const success = await copyToClipboard(url);
+    if (success) {
+      toast.success("Link copied!");
+    } else {
+      toast.info(`Share link: ${url}`, { description: url, duration: 8000 });
     }
   };
 
@@ -149,6 +160,18 @@ export default function ReportsHistory() {
                       <Eye className="w-4 h-4" />
                       {report.submitted ? "View" : "Continue"}
                     </Button>
+                    {report.submitted && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5 text-muted-foreground hover:text-foreground"
+                        onClick={() => handleShare(report.id)}
+                        data-ocid={`reports.share.button.${idx + 1}`}
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Share
+                      </Button>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button

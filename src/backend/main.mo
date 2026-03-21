@@ -51,6 +51,20 @@ actor {
   let userProfiles = Map.empty<Principal, UserProfile>();
   let reports = Map.empty<Text, Report>();
 
+  // Stable storage so reports survive canister upgrades/redeployments
+  stable var reportsEntries : [(Text, Report)] = [];
+
+  system func preupgrade() {
+    reportsEntries := reports.entries().toArray();
+  };
+
+  system func postupgrade() {
+    for ((k, v) in reportsEntries.vals()) {
+      reports.add(k, v);
+    };
+    reportsEntries := [];
+  };
+
   let checklistTemplate : [ChecklistItem] = [
     { id = "sm1"; section = "Solar Modules"; task = "Cleaning & wiping with fresh water"; status = #Unchecked; comment = "" },
     { id = "sm2"; section = "Solar Modules"; task = "Visual Inspection of modules, mounting clamps, MC4 connectors"; status = #Unchecked; comment = "" },

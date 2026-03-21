@@ -1,8 +1,11 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Outlet } from "@tanstack/react-router";
+import { useKeepAlive } from "../hooks/useKeepAlive";
 import AppSidebar from "./AppSidebar";
 
 export default function AppLayout() {
+  useKeepAlive();
+
   return (
     <div className="min-h-screen bg-background flex">
       <AppSidebar />

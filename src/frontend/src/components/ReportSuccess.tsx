@@ -11,6 +11,7 @@ import {
   type Report,
   Variant_NA_Fail_Pass_Unchecked,
 } from "../hooks/useQueries";
+import { copyToClipboard } from "../lib/clipboard";
 
 interface Props {
   report: Report & {
@@ -29,13 +30,16 @@ export default function ReportSuccess({ report, reportId }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(reportUrl);
+    const success = await copyToClipboard(reportUrl);
+    if (success) {
       setCopied(true);
       toast.success("Link copied to clipboard!");
       setTimeout(() => setCopied(false), 2500);
-    } catch {
-      toast.error("Could not copy link. Please copy it manually.");
+    } else {
+      toast.info("Tap and hold to copy the link manually:", {
+        description: reportUrl,
+        duration: 10000,
+      });
     }
   };
 

@@ -8,13 +8,15 @@ import {
   Clock,
   FilePlus,
   FileText,
+  Share2,
   Sun,
   TrendingUp,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { MONTH_NAMES } from "../data/checklistData";
-import { useCreateReport, useListReports } from "../hooks/useQueries";
+import { useListReports } from "../hooks/useQueries";
+import { copyToClipboard } from "../lib/clipboard";
 
 export default function Dashboard() {
   const now = new Date();
@@ -24,18 +26,9 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
   const { data: reports, isLoading } = useListReports();
-  const createReport = useCreateReport();
 
-  const handleNewReport = async () => {
-    try {
-      const reportId = await createReport.mutateAsync({
-        month: currentMonth,
-        year: currentYear,
-      });
-      navigate({ to: `/checklist/${reportId}` });
-    } catch {
-      toast.error("Failed to create report. Please try again.");
-    }
+  const handleNewReport = () => {
+    navigate({ to: "/checklist/new" });
   };
 
   const recentReports =
@@ -52,6 +45,17 @@ export default function Dashboard() {
         ? `/reports/${report.id}`
         : `/checklist/${report.id}`,
     });
+  };
+
+  const handleShare = async (e: React.MouseEvent, reportId: string) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/reports/${reportId}`;
+    const success = await copyToClipboard(url);
+    if (success) {
+      toast.success("Link copied!");
+    } else {
+      toast.info(`Share link: ${url}`, { description: url, duration: 8000 });
+    }
   };
 
   return (
@@ -78,12 +82,11 @@ export default function Dashboard() {
         <Button
           size="lg"
           onClick={handleNewReport}
-          disabled={createReport.isPending}
           className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shadow-card"
           data-ocid="dashboard.new_report.primary_button"
         >
           <FilePlus className="w-5 h-5" />
-          {createReport.isPending ? "Creating..." : "Start New Report"}
+          Start New Report
         </Button>
       </motion.div>
 
@@ -176,12 +179,15 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-2" data-ocid="dashboard.reports.list">
                 {recentReports.map((report, idx) => (
-                  <button
+                  <div
                     key={report.id}
-                    type="button"
                     data-ocid={`dashboard.report.item.${idx + 1}`}
-                    className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors text-left"
+                    className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => handleReportClick(report)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ")
+                        handleReportClick(report);
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
@@ -197,17 +203,30 @@ export default function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      className={
-                        report.submitted
-                          ? "bg-success/15 text-success border-success/30"
-                          : "bg-warning/15 text-warning-foreground border-warning/30"
-                      }
-                      variant="outline"
-                    >
-                      {report.submitted ? "Submitted" : "Draft"}
-                    </Badge>
-                  </button>
+                    <div className="flex items-center gap-2">
+                      {report.submitted && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleShare(e, report.id)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Copy share link"
+                          data-ocid={`dashboard.share.button.${idx + 1}`}
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      <Badge
+                        className={
+                          report.submitted
+                            ? "bg-success/15 text-success border-success/30"
+                            : "bg-warning/15 text-warning-foreground border-warning/30"
+                        }
+                        variant="outline"
+                      >
+                        {report.submitted ? "Submitted" : "Draft"}
+                      </Badge>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

@@ -7,10 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useParams } from "@tanstack/react-router";
-import { AlertCircle, ChevronRight, Loader2, Send } from "lucide-react";
+import { AlertCircle, ChevronRight, Loader2, Save, Send } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import PhotoAttachments from "../components/PhotoAttachments";
 import ReportSuccess from "../components/ReportSuccess";
 import {
   CHECKLIST_SECTIONS,
@@ -25,6 +26,7 @@ import {
   useUpdateMetadata,
 } from "../hooks/useQueries";
 import type { Report } from "../hooks/useQueries";
+import { copyToClipboard } from "../lib/clipboard";
 
 export default function ChecklistForm() {
   const { reportId } = useParams({ from: "/checklist/$reportId" });
@@ -35,6 +37,14 @@ export default function ChecklistForm() {
   const submitReport = useSubmitReport();
 
   const [submitted, setSubmitted] = useState(false);
+  const [reportName, setReportName] = useState(
+    () => localStorage.getItem(`reportName:${reportId}`) || "",
+  );
+
+  const handleReportNameChange = (value: string) => {
+    setReportName(value);
+    localStorage.setItem(`reportName:${reportId}`, value);
+  };
 
   const [meta, setMeta] = useState({
     clientName: "",
@@ -120,14 +130,17 @@ export default function ChecklistForm() {
       await updateMeta.mutateAsync(meta);
       await submitReport.mutateAsync(reportId);
       const reportUrl = `${window.location.origin}/reports/${reportId}`;
-      try {
-        await navigator.clipboard.writeText(reportUrl);
+      const copied = await copyToClipboard(reportUrl);
+      if (copied) {
         toast.success("Report submitted! Link copied to clipboard.", {
           description: "Paste and share it via WhatsApp or SMS.",
           duration: 5000,
         });
-      } catch {
-        toast.success("Report submitted successfully!");
+      } else {
+        toast.success("Report submitted successfully!", {
+          description: `Share this link: ${reportUrl}`,
+          duration: 8000,
+        });
       }
       setSubmitted(true);
     } catch {
@@ -348,14 +361,14 @@ export default function ChecklistForm() {
           );
         })}
 
-        {/* Notes */}
+        {/* Notes & Photos */}
         <div className="bg-card border border-border rounded-lg overflow-hidden shadow-card mb-4">
           <div className="bg-section-pale border-b border-border px-5 py-3">
             <h2 className="font-semibold text-primary text-sm">
               Notes &amp; Recommendations
             </h2>
           </div>
-          <div className="p-5">
+          <div className="p-5 space-y-4">
             <Textarea
               placeholder="Enter any observations, recommendations, or follow-up actions..."
               value={meta.notes}
@@ -363,6 +376,37 @@ export default function ChecklistForm() {
               rows={5}
               className="resize-none"
               data-ocid="checklist.notes.textarea"
+            />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Photo Attachments
+              </p>
+              <PhotoAttachments reportId={reportId} />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Report As */}
+        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-card mb-4">
+          <div className="bg-section-pale border-b border-border px-5 py-3 flex items-center gap-2">
+            <Save className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-primary text-sm">
+              Save Report As
+            </h2>
+          </div>
+          <div className="p-5">
+            <Label htmlFor="reportName" className="text-sm font-medium">
+              Report Name
+            </Label>
+            <p className="text-xs text-muted-foreground mb-2 mt-0.5">
+              Give this report a custom name for easy identification (optional)
+            </p>
+            <Input
+              id="reportName"
+              placeholder={`e.g. ${monthName} ${String(report.year)} – ${meta.clientName || "Client Name"}`}
+              value={reportName}
+              onChange={(e) => handleReportNameChange(e.target.value)}
+              data-ocid="checklist.report_name.input"
             />
           </div>
         </div>
