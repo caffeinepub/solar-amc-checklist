@@ -27,6 +27,10 @@ import {
 } from "../hooks/useQueries";
 import type { Report } from "../hooks/useQueries";
 import { copyToClipboard } from "../lib/clipboard";
+import {
+  combineNotesAndPhotos,
+  parseNotesAndPhotos,
+} from "../lib/photoStorage";
 
 export default function ChecklistForm() {
   const { reportId } = useParams({ from: "/checklist/$reportId" });
@@ -53,6 +57,7 @@ export default function ChecklistForm() {
     date: new Date().toISOString().split("T")[0],
     solarGenerationUnits: "",
     solarGenerationPerMonth: "",
+    // notes field stores combined notes+photos using photoStorage delimiter
     notes: "",
   });
 
@@ -87,6 +92,19 @@ export default function ChecklistForm() {
     const updated = { ...meta, [field]: value };
     setMeta(updated);
     saveMeta(updated);
+  };
+
+  // Notes textarea shows only the text portion (not the embedded photo data)
+  const { notes: notesText } = parseNotesAndPhotos(meta.notes);
+
+  const handleNotesTextChange = (newText: string) => {
+    const { photos } = parseNotesAndPhotos(meta.notes);
+    handleMetaChange("notes", combineNotesAndPhotos(newText, photos));
+  };
+
+  // PhotoAttachments updates the combined notes string
+  const handleNotesChange = (newCombined: string) => {
+    handleMetaChange("notes", newCombined);
   };
 
   const [localItems, setLocalItems] = useState<
@@ -127,6 +145,8 @@ export default function ChecklistForm() {
   const handleSubmit = async () => {
     if (!isFormComplete) return;
     try {
+      // Flush any pending debounced save with the latest meta (including photos)
+      if (saveTimer.current) clearTimeout(saveTimer.current);
       await updateMeta.mutateAsync(meta);
       await submitReport.mutateAsync(reportId);
       const reportUrl = `${window.location.origin}/reports/${reportId}`;
@@ -371,8 +391,8 @@ export default function ChecklistForm() {
           <div className="p-5 space-y-4">
             <Textarea
               placeholder="Enter any observations, recommendations, or follow-up actions..."
-              value={meta.notes}
-              onChange={(e) => handleMetaChange("notes", e.target.value)}
+              value={notesText}
+              onChange={(e) => handleNotesTextChange(e.target.value)}
               rows={5}
               className="resize-none"
               data-ocid="checklist.notes.textarea"
@@ -381,7 +401,10 @@ export default function ChecklistForm() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                 Photo Attachments
               </p>
-              <PhotoAttachments reportId={reportId} />
+              <PhotoAttachments
+                combinedNotes={meta.notes}
+                onNotesChange={handleNotesChange}
+              />
             </div>
           </div>
         </div>

@@ -51,6 +51,7 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getReport' : IDL.Func([IDL.Text], [Report], ['query']),
+  'getReportPhotos' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -89,6 +90,7 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'updateReportPhotos' : IDL.Func([IDL.Text, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -137,6 +139,7 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getReport' : IDL.Func([IDL.Text], [Report], ['query']),
+    'getReportPhotos' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -175,6 +178,7 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'updateReportPhotos' : IDL.Func([IDL.Text, IDL.Text], [], []),
   });
 };
 

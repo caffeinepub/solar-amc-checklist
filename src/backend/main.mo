@@ -10,6 +10,7 @@ import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
+import MixinBlobStorage "blob-storage/Mixin";
 
 actor {
   type ChecklistItem = {
@@ -47,15 +48,19 @@ actor {
 
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+  include MixinBlobStorage();
 
   let userProfiles = Map.empty<Principal, UserProfile>();
   let reports = Map.empty<Text, Report>();
+  let reportPhotos = Map.empty<Text, Text>();
 
   // Stable storage so reports survive canister upgrades/redeployments
   stable var reportsEntries : [(Text, Report)] = [];
+  stable var reportPhotosEntries : [(Text, Text)] = [];
 
   system func preupgrade() {
     reportsEntries := reports.entries().toArray();
+    reportPhotosEntries := reportPhotos.entries().toArray();
   };
 
   system func postupgrade() {
@@ -63,6 +68,10 @@ actor {
       reports.add(k, v);
     };
     reportsEntries := [];
+    for ((k, v) in reportPhotosEntries.vals()) {
+      reportPhotos.add(k, v);
+    };
+    reportPhotosEntries := [];
   };
 
   let checklistTemplate : [ChecklistItem] = [
@@ -146,6 +155,17 @@ actor {
     };
   };
 
+  public shared func updateReportPhotos(reportId : Text, photos : Text) : async () {
+    reportPhotos.add(reportId, photos);
+  };
+
+  public query func getReportPhotos(reportId : Text) : async Text {
+    switch (reportPhotos.get(reportId)) {
+      case (null) { "[]" };
+      case (?photos) { photos };
+    };
+  };
+
   public shared func submitReport(reportId : Text) : async () {
     switch (reports.get(reportId)) {
       case (null) { Runtime.trap("Report not found") };
@@ -177,7 +197,10 @@ actor {
   public shared func deleteReport(reportId : Text) : async () {
     switch (reports.get(reportId)) {
       case (null) { Runtime.trap("Report not found") };
-      case (?_) { reports.remove(reportId) };
+      case (?_) {
+        reports.remove(reportId);
+        reportPhotos.remove(reportId);
+      };
     };
   };
 };

@@ -29,6 +29,32 @@ export function useGetReport(reportId: string | undefined) {
   });
 }
 
+export function useGetReportPhotos(reportId: string | undefined) {
+  const { actor, isFetching } = useActor();
+  return useQuery<string>({
+    queryKey: ["reportPhotos", reportId],
+    queryFn: async () => {
+      if (!actor || !reportId) return "[]";
+      return actor.getReportPhotos(reportId);
+    },
+    enabled: !!actor && !isFetching && !!reportId,
+  });
+}
+
+export function useUpdateReportPhotos(reportId: string) {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (photos: string) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateReportPhotos(reportId, photos);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reportPhotos", reportId] });
+    },
+  });
+}
+
 export function useCreateReport() {
   const { actor } = useActor();
   const qc = useQueryClient();

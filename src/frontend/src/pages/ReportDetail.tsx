@@ -4,25 +4,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
+import { useMemo } from "react";
 import { MONTH_NAMES } from "../data/checklistData";
 import { useGetReport } from "../hooks/useQueries";
+import { parseNotesAndPhotos } from "../lib/photoStorage";
 
 export default function ReportDetail() {
   const { reportId } = useParams({ from: "/reports/$reportId" });
   const navigate = useNavigate();
   const { data: report, isLoading } = useGetReport(reportId);
 
-  const reportName = localStorage.getItem(`reportName:${reportId}`) || "";
+  const { notes: notesText, photos } = useMemo(
+    () => parseNotesAndPhotos(report?.notes || ""),
+    [report?.notes],
+  );
 
-  const photos: string[] = (() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem(`reportPhotos:${reportId}`) || "[]",
-      );
-    } catch {
-      return [];
-    }
-  })();
+  const reportName = localStorage.getItem(`reportName:${reportId}`) || "";
 
   if (isLoading || !report) {
     return (
@@ -74,7 +71,7 @@ export default function ReportDetail() {
               }
               variant="outline"
             >
-              {report.submitted ? "✓ Submitted" : "Draft"}
+              {report.submitted ? "\u2713 Submitted" : "Draft"}
             </Badge>
           </div>
         </div>
@@ -98,24 +95,30 @@ export default function ReportDetail() {
               </div>
               <div>
                 <span className="text-white/60">Client: </span>
-                <span className="font-medium">{report.clientName || "—"}</span>
+                <span className="font-medium">
+                  {report.clientName || "\u2014"}
+                </span>
               </div>
               <div>
                 <span className="text-white/60">System ID: </span>
-                <span className="font-medium">{report.systemId || "—"}</span>
+                <span className="font-medium">
+                  {report.systemId || "\u2014"}
+                </span>
               </div>
               <div>
                 <span className="text-white/60">Inspected By: </span>
-                <span className="font-medium">{report.inspectedBy || "—"}</span>
+                <span className="font-medium">
+                  {report.inspectedBy || "\u2014"}
+                </span>
               </div>
               <div>
                 <span className="text-white/60">Date: </span>
-                <span className="font-medium">{report.date || "—"}</span>
+                <span className="font-medium">{report.date || "\u2014"}</span>
               </div>
               <div>
                 <span className="text-white/60">Solar Generation: </span>
                 <span className="font-medium">
-                  {report.solarGenerationUnits || "—"}
+                  {report.solarGenerationUnits || "\u2014"}
                 </span>
               </div>
             </div>
@@ -126,9 +129,9 @@ export default function ReportDetail() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Notes &amp; Recommendations
             </p>
-            {report.notes ? (
+            {notesText ? (
               <p className="text-sm text-foreground whitespace-pre-wrap">
-                {report.notes}
+                {notesText}
               </p>
             ) : (
               <p className="text-sm text-muted-foreground italic">
@@ -138,29 +141,43 @@ export default function ReportDetail() {
           </div>
 
           {/* Photo Attachments */}
-          {photos.length > 0 && (
-            <div className="px-5 py-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Attachments ({photos.length})
-              </p>
+          <div className="px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Attachments
+              {photos.length > 0 && ` (${photos.length})`}
+            </p>
+            {photos.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
-                {photos.map((src, idx) => (
+                {photos.map((photo, idx) => (
                   <div
                     // biome-ignore lint/suspicious/noArrayIndexKey: photos are order-dependent
                     key={idx}
-                    className="rounded-md overflow-hidden border border-border"
-                    style={{ aspectRatio: "1" }}
+                    className="rounded-md overflow-hidden border border-border flex flex-col"
                   >
-                    <img
-                      src={src}
-                      alt={`Attachment ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    <div style={{ aspectRatio: "1" }}>
+                      <img
+                        src={photo.dataUrl}
+                        alt={photo.label || `Attachment ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {photo.label && (
+                      <p className="px-1.5 py-1 text-xs text-muted-foreground bg-background border-t border-border truncate">
+                        {photo.label}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p
+                className="text-sm text-muted-foreground italic"
+                data-ocid="report_detail.empty_state"
+              >
+                No photos attached.
+              </p>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>

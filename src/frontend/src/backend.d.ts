@@ -51,6 +51,7 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getReport(reportId: string): Promise<Report>;
+    getReportPhotos(reportId: string): Promise<string>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     listReports(): Promise<Array<Report>>;
@@ -58,4 +59,5 @@ export interface backendInterface {
     submitReport(reportId: string): Promise<void>;
     updateChecklistItem(reportId: string, itemId: string, status: Variant_NA_Fail_Pass_Unchecked, comment: string): Promise<void>;
     updateReportMetadata(reportId: string, clientName: string, systemId: string, inspectedBy: string, date: string, solarGenerationUnits: string, solarGenerationPerMonth: string, notes: string): Promise<void>;
+    updateReportPhotos(reportId: string, photos: string): Promise<void>;
 }

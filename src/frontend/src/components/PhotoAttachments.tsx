@@ -1,10 +1,52 @@
 import { Button } from "@/components/ui/button";
-import { Camera, ImagePlus, RotateCcw, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Camera, ImagePlus, Loader2, RotateCcw, Tag, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useCamera } from "../camera/useCamera";
+import {
+  type PhotoEntry,
+  combineNotesAndPhotos,
+  parseNotesAndPhotos,
+} from "../lib/photoStorage";
 
 interface PhotoAttachmentsProps {
-  reportId: string;
+  /** The full combined notes+photos string from the parent. */
+  combinedNotes: string;
+  /** Called whenever photos change; parent should update its notes state. */
+  onNotesChange: (newCombined: string) => void;
+}
+
+async function compressImage(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX_DIM = 1024;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = objectUrl;
+  });
 }
 
 function CameraPermissionDialog({
@@ -51,20 +93,21 @@ function CameraPermissionDialog({
   );
 }
 
-export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
-  const storageKey = `reportPhotos:${reportId}`;
+export default function PhotoAttachments({
+  combinedNotes,
+  onNotesChange,
+}: PhotoAttachmentsProps) {
+  const { notes, photos: entries } = parseNotesAndPhotos(combinedNotes);
 
-  const [photos, setPhotos] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch {
-      return [];
-    }
-  });
-
+  const [compressing, setCompressing] = useState(false);
+  const [compressProgress, setCompressProgress] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const updateEntries = (newEntries: PhotoEntry[]) => {
+    onNotesChange(combineNotesAndPhotos(notes, newEntries));
+  };
 
   const {
     isActive,
@@ -92,77 +135,75 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
     }
   }, [showCamera]);
 
-  const savePhotos = (updated: string[]) => {
-    setPhotos(updated);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
+  const addPhoto = async (file: File | Blob) => {
+    setCompressing(true);
+    setCompressProgress(10);
+    try {
+      const dataUrl = await compressImage(file);
+      setCompressProgress(100);
+      updateEntries([...entries, { dataUrl, label: "" }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Failed to process photo: ${msg}`);
+    } finally {
+      setCompressing(false);
+      setCompressProgress(0);
+    }
   };
 
   const handleCapture = async () => {
     const file = await capturePhoto();
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      const updated = [...photos, dataUrl];
-      savePhotos(updated);
-      setShowCamera(false);
-    };
-    reader.readAsDataURL(file);
+    setShowCamera(false);
+    await addPhoto(file);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    const readers = files.map(
-      (file) =>
-        new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve(ev.target?.result as string);
-          reader.readAsDataURL(file);
-        }),
-    );
-    Promise.all(readers).then((dataUrls) => {
-      const updated = [...photos, ...dataUrls];
-      savePhotos(updated);
-    });
     e.target.value = "";
-  };
-
-  const removePhoto = (idx: number) => {
-    const updated = photos.filter((_, i) => i !== idx);
-    savePhotos(updated);
-  };
-
-  const handleTakePhotoClick = () => {
-    if (showCamera) {
-      setShowCamera(false);
-    } else {
-      setShowPermissionDialog(true);
+    setCompressing(true);
+    setCompressProgress(0);
+    try {
+      const newEntries: PhotoEntry[] = [];
+      for (let i = 0; i < files.length; i++) {
+        setCompressProgress(Math.round(((i + 0.5) / files.length) * 90));
+        const dataUrl = await compressImage(files[i]);
+        newEntries.push({ dataUrl, label: "" });
+      }
+      setCompressProgress(100);
+      updateEntries([...entries, ...newEntries]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Failed to process photo: ${msg}`);
+    } finally {
+      setCompressing(false);
+      setCompressProgress(0);
     }
   };
 
-  const handlePermissionAllow = () => {
-    setShowPermissionDialog(false);
-    setShowCamera(true);
+  const removePhoto = (idx: number) => {
+    updateEntries(entries.filter((_, i) => i !== idx));
   };
 
-  const handlePermissionDeny = () => {
-    setShowPermissionDialog(false);
+  const updateLabel = (idx: number, label: string) => {
+    updateEntries(entries.map((p, i) => (i === idx ? { ...p, label } : p)));
   };
 
   const permissionDenied = error?.type === "permission";
 
   return (
     <div data-ocid="photo_attachments.root">
-      {/* Camera permission dialog */}
       {showPermissionDialog && (
         <CameraPermissionDialog
-          onAllow={handlePermissionAllow}
-          onDeny={handlePermissionDeny}
+          onAllow={() => {
+            setShowPermissionDialog(false);
+            setShowCamera(true);
+          }}
+          onDeny={() => setShowPermissionDialog(false)}
         />
       )}
 
-      {/* Action buttons */}
       <div className="flex gap-2 mb-3">
         {isSupported !== false && !permissionDenied && (
           <Button
@@ -170,7 +211,10 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
             variant="outline"
             size="sm"
             className="gap-1.5 text-sm"
-            onClick={handleTakePhotoClick}
+            onClick={() =>
+              showCamera ? setShowCamera(false) : setShowPermissionDialog(true)
+            }
+            disabled={compressing}
             data-ocid="photo_attachments.camera.button"
           >
             <Camera className="w-4 h-4" />
@@ -183,6 +227,7 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
           size="sm"
           className="gap-1.5 text-sm"
           onClick={() => fileInputRef.current?.click()}
+          disabled={compressing}
           data-ocid="photo_attachments.gallery.button"
         >
           <ImagePlus className="w-4 h-4" />
@@ -198,7 +243,18 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
         />
       </div>
 
-      {/* Permission denied notice */}
+      {compressing && (
+        <div className="mb-3" data-ocid="photo_attachments.loading_state">
+          <div className="flex items-center gap-2 mb-1">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">
+              Processing photo... {compressProgress}%
+            </span>
+          </div>
+          <Progress value={compressProgress} className="h-1.5" />
+        </div>
+      )}
+
       {permissionDenied && (
         <div className="mb-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">
           Camera access was denied. Please allow camera permission in your
@@ -207,7 +263,6 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
         </div>
       )}
 
-      {/* Camera preview */}
       {showCamera && !permissionDenied && (
         <div className="mb-4 rounded-lg overflow-hidden border border-border bg-black">
           {error ? (
@@ -257,7 +312,7 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
                   size="sm"
                   className="bg-white text-black hover:bg-white/90 px-6 font-semibold"
                   onClick={handleCapture}
-                  disabled={!isActive || isLoading}
+                  disabled={!isActive || isLoading || compressing}
                   data-ocid="photo_attachments.capture.button"
                 >
                   Capture
@@ -277,29 +332,40 @@ export default function PhotoAttachments({ reportId }: PhotoAttachmentsProps) {
         </div>
       )}
 
-      {/* Photo thumbnails */}
-      {photos.length > 0 && (
+      {entries.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
-          {photos.map((src, idx) => (
+          {entries.map((photo, idx) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: photos are order-dependent
               key={idx}
-              className="relative rounded-md overflow-hidden border border-border group"
-              style={{ aspectRatio: "1" }}
+              className="relative rounded-md overflow-hidden border border-border group flex flex-col"
             >
-              <img
-                src={src}
-                alt={`Attachment ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => removePhoto(idx)}
-                className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                data-ocid={`photo_attachments.remove.button.${idx + 1}`}
-              >
-                <X className="w-3 h-3" />
-              </button>
+              <div className="relative" style={{ aspectRatio: "1" }}>
+                <img
+                  src={photo.dataUrl}
+                  alt={photo.label || `Attachment ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(idx)}
+                  className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-ocid={`photo_attachments.delete_button.${idx + 1}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1 border-t border-border bg-muted/20 px-1.5 py-1">
+                <Tag className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <input
+                  type="text"
+                  value={photo.label}
+                  onChange={(e) => updateLabel(idx, e.target.value)}
+                  placeholder="Add a label..."
+                  className="flex-1 text-xs bg-transparent focus:outline-none placeholder:text-muted-foreground/60 text-foreground"
+                  data-ocid={`photo_attachments.label.input.${idx + 1}`}
+                />
+              </div>
             </div>
           ))}
         </div>

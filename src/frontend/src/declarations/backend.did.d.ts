@@ -48,6 +48,7 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getReport' : ActorMethod<[string], Report>,
+  'getReportPhotos' : ActorMethod<[string], string>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'listReports' : ActorMethod<[], Array<Report>>,
@@ -69,6 +70,7 @@ export interface _SERVICE {
     [string, string, string, string, string, string, string, string],
     undefined
   >,
+  'updateReportPhotos' : ActorMethod<[string, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

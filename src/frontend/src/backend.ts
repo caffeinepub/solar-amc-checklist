@@ -134,6 +134,7 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getReport(reportId: string): Promise<Report>;
+    getReportPhotos(reportId: string): Promise<string>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     listReports(): Promise<Array<Report>>;
@@ -141,6 +142,7 @@ export interface backendInterface {
     submitReport(reportId: string): Promise<void>;
     updateChecklistItem(reportId: string, itemId: string, status: Variant_NA_Fail_Pass_Unchecked, comment: string): Promise<void>;
     updateReportMetadata(reportId: string, clientName: string, systemId: string, inspectedBy: string, date: string, solarGenerationUnits: string, solarGenerationPerMonth: string, notes: string): Promise<void>;
+    updateReportPhotos(reportId: string, photos: string): Promise<void>;
 }
 import type { ChecklistItem as _ChecklistItem, Report as _Report, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -243,6 +245,20 @@ export class Backend implements backendInterface {
             return from_candid_Report_n6(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getReportPhotos(arg0: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getReportPhotos(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getReportPhotos(arg0);
+            return result;
+        }
+    }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
@@ -338,6 +354,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateReportMetadata(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return result;
+        }
+    }
+    async updateReportPhotos(arg0: string, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateReportPhotos(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateReportPhotos(arg0, arg1);
             return result;
         }
     }
