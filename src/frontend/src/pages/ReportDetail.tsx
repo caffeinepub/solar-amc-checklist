@@ -5,8 +5,11 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
-import { MONTH_NAMES } from "../data/checklistData";
-import { useGetReport } from "../hooks/useQueries";
+import { CHECKLIST_SECTIONS, MONTH_NAMES } from "../data/checklistData";
+import {
+  Variant_NA_Fail_Pass_Unchecked,
+  useGetReport,
+} from "../hooks/useQueries";
 import { parseNotesAndPhotos } from "../lib/photoStorage";
 
 export default function ReportDetail() {
@@ -18,6 +21,16 @@ export default function ReportDetail() {
     () => parseNotesAndPhotos(report?.notes || ""),
     [report?.notes],
   );
+
+  // Build a quick lookup map from item id -> status from the report
+  // Must be before early return to satisfy hooks rules
+  const itemStatusMap = useMemo(() => {
+    const map: Record<string, Variant_NA_Fail_Pass_Unchecked> = {};
+    for (const item of report?.items ?? []) {
+      map[item.id] = item.status;
+    }
+    return map;
+  }, [report?.items]);
 
   const reportName = localStorage.getItem(`reportName:${reportId}`) || "";
 
@@ -88,10 +101,8 @@ export default function ReportDetail() {
             </h2>
             <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
               <div>
-                <span className="text-white/60">Period: </span>
-                <span className="font-medium">
-                  {monthName} {String(report.year)}
-                </span>
+                <span className="text-white/60">Visit Date: </span>
+                <span className="font-medium">{report.date || "\u2014"}</span>
               </div>
               <div>
                 <span className="text-white/60">Client: </span>
@@ -100,7 +111,7 @@ export default function ReportDetail() {
                 </span>
               </div>
               <div>
-                <span className="text-white/60">System ID: </span>
+                <span className="text-white/60">System Capacity: </span>
                 <span className="font-medium">
                   {report.systemId || "\u2014"}
                 </span>
@@ -111,14 +122,12 @@ export default function ReportDetail() {
                   {report.inspectedBy || "\u2014"}
                 </span>
               </div>
-              <div>
-                <span className="text-white/60">Date: </span>
-                <span className="font-medium">{report.date || "\u2014"}</span>
-              </div>
-              <div>
-                <span className="text-white/60">Solar Generation: </span>
+              <div className="col-span-2">
+                <span className="text-white/60">
+                  Solar Generation (Last Month):{" "}
+                </span>
                 <span className="font-medium">
-                  {report.solarGenerationUnits || "\u2014"}
+                  {report.solarGenerationPerMonth || "\u2014"}
                 </span>
               </div>
             </div>
@@ -141,7 +150,7 @@ export default function ReportDetail() {
           </div>
 
           {/* Photo Attachments */}
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 border-b border-border">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Attachments
               {photos.length > 0 && ` (${photos.length})`}
@@ -172,11 +181,64 @@ export default function ReportDetail() {
             ) : (
               <p
                 className="text-sm text-muted-foreground italic"
-                data-ocid="report_detail.empty_state"
+                data-ocid="report_detail.photos.empty_state"
               >
                 No photos attached.
               </p>
             )}
+          </div>
+
+          {/* Checklist Summary */}
+          <div className="px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+              Checklist Summary
+            </p>
+            <div className="space-y-4">
+              {CHECKLIST_SECTIONS.map((section) => {
+                const SectionIcon = section.icon;
+                return (
+                  <div key={section.id}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <SectionIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        {section.title}
+                      </p>
+                    </div>
+                    <div className="space-y-1 pl-1">
+                      {section.items.map((item) => {
+                        const status =
+                          itemStatusMap[item.id] ??
+                          Variant_NA_Fail_Pass_Unchecked.Unchecked;
+                        const isChecked =
+                          status !== Variant_NA_Fail_Pass_Unchecked.Unchecked;
+                        return (
+                          <div key={item.id} className="flex items-start gap-2">
+                            <span
+                              className={`mt-0.5 text-sm font-bold flex-shrink-0 ${
+                                isChecked
+                                  ? "text-success"
+                                  : "text-muted-foreground/40"
+                              }`}
+                            >
+                              {isChecked ? "\u2713" : "\u2717"}
+                            </span>
+                            <span
+                              className={`text-sm leading-snug ${
+                                isChecked
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {item.task}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </motion.div>

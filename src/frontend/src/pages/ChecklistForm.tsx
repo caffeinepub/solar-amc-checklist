@@ -52,10 +52,10 @@ export default function ChecklistForm() {
 
   const [meta, setMeta] = useState({
     clientName: "",
-    systemId: "",
+    systemId: "", // repurposed as System Capacity in UI
     inspectedBy: "",
     date: new Date().toISOString().split("T")[0],
-    solarGenerationUnits: "",
+    solarGenerationUnits: "", // hidden from UI, kept for backend
     solarGenerationPerMonth: "",
     // notes field stores combined notes+photos using photoStorage delimiter
     notes: "",
@@ -262,15 +262,15 @@ export default function ChecklistForm() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="systemId" className="text-sm font-medium">
-                System ID
+              <Label htmlFor="systemCapacity" className="text-sm font-medium">
+                System Capacity
               </Label>
               <Input
-                id="systemId"
-                placeholder="e.g. SYS-001"
+                id="systemCapacity"
+                placeholder="e.g. 10 kWp"
                 value={meta.systemId}
                 onChange={(e) => handleMetaChange("systemId", e.target.value)}
-                data-ocid="checklist.system_id.input"
+                data-ocid="checklist.system_capacity.input"
               />
             </div>
             <div className="space-y-1.5">
@@ -299,27 +299,13 @@ export default function ChecklistForm() {
                 data-ocid="checklist.date.input"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="solarUnits" className="text-sm font-medium">
-                Solar Generation (units)
-              </Label>
-              <Input
-                id="solarUnits"
-                placeholder="e.g. 450 kWh"
-                value={meta.solarGenerationUnits}
-                onChange={(e) =>
-                  handleMetaChange("solarGenerationUnits", e.target.value)
-                }
-                data-ocid="checklist.solar_units.input"
-              />
-            </div>
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5">
               <Label htmlFor="solarPerMonth" className="text-sm font-medium">
-                Solar Generation Per Month
+                Solar Generation of Last Month
               </Label>
               <Input
                 id="solarPerMonth"
-                placeholder="e.g. 450 kWh/month"
+                placeholder="e.g. 450 kWh"
                 value={meta.solarGenerationPerMonth}
                 onChange={(e) =>
                   handleMetaChange("solarGenerationPerMonth", e.target.value)

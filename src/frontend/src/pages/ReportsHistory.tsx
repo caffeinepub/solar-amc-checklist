@@ -139,7 +139,6 @@ export default function ReportsHistory() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {report.clientName || "No client"}
-                      {report.systemId ? ` · ${report.systemId}` : ""}
                       {report.inspectedBy ? ` · ${report.inspectedBy}` : ""}
                     </p>
                   </div>
